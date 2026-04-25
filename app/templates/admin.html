@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Panel</title>
+  <style>
+    body {
+      background: #111;
+      color: white;
+      font-family: Arial;
+      padding: 20px;
+    }
+
+    button {
+      padding: 10px;
+      margin: 5px;
+      cursor: pointer;
+      border: none;
+      background: #e50914;
+      color: white;
+      border-radius: 5px;
+    }
+
+    .card {
+      background: #222;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>⚙️ Admin Dashboard</h2>
+
+<div class="card">
+  <h3>📊 Stats</h3>
+  <button onclick="loadStats()">Refresh</button>
+  <pre id="stats"></pre>
+</div>
+
+<div class="card">
+  <h3>🎬 VOD</h3>
+  <button onclick="scan()">Scan Library</button>
+  <button onclick="clearCache()">Clear Cache</button>
+</div>
+
+<div class="card">
+  <h3>☁️ rclone</h3>
+  <button onclick="start()">Start</button>
+  <button onclick="stop()">Stop</button>
+  <button onclick="status()">Check Status</button>
+  <pre id="rclone"></pre>
+</div>
+
+<script>
+function scan() {
+  fetch('/admin/scan').then(r=>r.json()).then(alert);
+}
+
+function clearCache() {
+  fetch('/admin/cache/clear').then(r=>r.json()).then(alert);
+}
+
+function loadStats() {
+  fetch('/admin/stats').then(r=>r.json()).then(d=>{
+    document.getElementById('stats').innerText = JSON.stringify(d, null, 2);
+  });
+}
+
+function start() {
+  fetch('/admin/rclone/start').then(r=>r.json()).then(alert);
+}
+
+function stop() {
+  fetch('/admin/rclone/stop').then(r=>r.json()).then(alert);
+}
+
+function status() {
+  fetch('/admin/rclone/status').then(r=>r.json()).then(d=>{
+    document.getElementById('rclone').innerText = JSON.stringify(d, null, 2);
+  });
+}
+</script>
+
+</body>
+</html>
