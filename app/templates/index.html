@@ -2,13 +2,50 @@
 <html>
 <head>
   <title>VOD</title>
+
   <style>
-    body { background:#141414; color:white; font-family:Arial; margin:0 }
-    header { padding:15px; background:black }
-    .row { margin:20px }
-    .scroll { display:flex; overflow-x:auto; gap:10px }
-    .card { min-width:150px; cursor:pointer }
-    .card img { width:150px; border-radius:5px }
+    body {
+      margin:0;
+      background:#141414;
+      color:white;
+      font-family:Arial;
+    }
+
+    header {
+      background:black;
+      padding:15px;
+      font-size:20px;
+    }
+
+    .row {
+      margin:20px;
+    }
+
+    .scroll {
+      display:flex;
+      overflow-x:auto;
+      gap:10px;
+    }
+
+    .card {
+      min-width:160px;
+      cursor:pointer;
+      transition:0.2s;
+    }
+
+    .card:hover {
+      transform:scale(1.1);
+    }
+
+    .card img {
+      width:160px;
+      border-radius:6px;
+    }
+
+    .title {
+      font-size:12px;
+      margin-top:5px;
+    }
   </style>
 </head>
 
@@ -24,17 +61,25 @@ fetch('/api')
   .then(data=>{
     Object.keys(data).forEach(cat=>{
       const row = document.createElement('div')
-      row.className='row'
+      row.className = 'row'
 
       row.innerHTML = `<h2>${cat}</h2><div class="scroll"></div>`
       const scroll = row.querySelector('.scroll')
 
       data[cat].forEach(item=>{
-        const c = document.createElement('div')
-        c.className='card'
-        c.innerHTML = `<img src="${item.poster}">`
-        c.onclick = ()=> window.location="/player?url="+encodeURIComponent(item.url)
-        scroll.appendChild(c)
+        const card = document.createElement('div')
+        card.className = 'card'
+
+        card.innerHTML = `
+          <img src="${item.poster}">
+          <div class="title">${item.title}</div>
+        `
+
+        card.onclick = () => {
+          window.location = "/player?url=" + encodeURIComponent(item.url)
+        }
+
+        scroll.appendChild(card)
       })
 
       document.getElementById('content').appendChild(row)
