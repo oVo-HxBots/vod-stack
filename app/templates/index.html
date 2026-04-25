@@ -14,16 +14,21 @@
 
     header {
       padding: 15px;
-      font-size: 22px;
       background: black;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    input {
+      padding: 8px;
+      border-radius: 4px;
+      border: none;
+      width: 200px;
     }
 
     .row {
       margin: 20px;
-    }
-
-    .row h2 {
-      margin-bottom: 10px;
     }
 
     .scroll {
@@ -33,55 +38,93 @@
     }
 
     .card {
-      min-width: 150px;
+      position: relative;
+      min-width: 160px;
       cursor: pointer;
       transition: transform 0.2s;
     }
 
     .card:hover {
       transform: scale(1.1);
+      z-index: 10;
     }
 
     .card img {
-      width: 150px;
-      border-radius: 5px;
+      width: 160px;
+      border-radius: 6px;
     }
 
-    .scroll::-webkit-scrollbar {
+    .overlay {
+      position: absolute;
+      bottom: 0;
+      background: rgba(0,0,0,0.8);
+      width: 100%;
+      padding: 5px;
+      font-size: 12px;
       display: none;
+    }
+
+    .card:hover .overlay {
+      display: block;
+    }
+
+    .play {
+      margin-top: 5px;
+      padding: 4px;
+      background: red;
+      text-align: center;
+      border-radius: 3px;
     }
   </style>
 </head>
 
 <body>
 
-<header>🎬 VOD Stack</header>
+<header>
+  <div>🎬 VOD Stack</div>
+  <input placeholder="Search..." onkeyup="search(this.value)">
+</header>
 
 <div id="content"></div>
 
 <script>
+let allData = [];
+
 fetch('/api')
-  .then(res => res.json())
+  .then(r => r.json())
   .then(data => {
-    renderCategory("Movies", data.movies);
-    renderCategory("Series", data.series);
+    allData = data;
+    renderAll(data);
   });
 
-function renderCategory(title, items) {
+function renderAll(data) {
+  document.getElementById("content").innerHTML = "";
+
+  Object.keys(data).forEach(group => {
+    renderRow(group, data[group]);
+  });
+}
+
+function renderRow(title, items) {
   const container = document.getElementById('content');
 
   const row = document.createElement('div');
   row.className = 'row';
 
   row.innerHTML = `<h2>${title}</h2><div class="scroll"></div>`;
-
   const scroll = row.querySelector('.scroll');
 
   items.forEach(item => {
     const card = document.createElement('div');
     card.className = 'card';
 
-    card.innerHTML = `<img src="${item.poster}" />`;
+    card.innerHTML = `
+      <img src="${item.poster}">
+      <div class="overlay">
+        ${item.title}
+        <div class="play">▶ Play</div>
+      </div>
+    `;
 
     card.onclick = () => {
       window.location = "/player?url=" + encodeURIComponent(item.url);
@@ -92,76 +135,18 @@ function renderCategory(title, items) {
 
   container.appendChild(row);
 }
-</script>
 
-</body>
-</html>
-    .card {
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
+function search(q) {
+  q = q.toLowerCase();
 
-    .card:hover {
-      transform: scale(1.05);
-    }
-
-    .card img {
-      width: 100%;
-      border-radius: 6px;
-    }
-
-    .title {
-      font-size: 14px;
-      margin-top: 5px;
-    }
-  </style>
-</head>
-
-<body>
-
-<header>🎬 VOD Stack</header>
-
-<input class="search" placeholder="Search..." onkeyup="filter()" id="search">
-
-<div class="container">
-  <div class="grid" id="grid"></div>
-</div>
-
-<script>
-let data = [];
-
-fetch('/api')
-  .then(res => res.json())
-  .then(json => {
-    data = [...json.movies, ...json.series];
-    render(data);
+  const filtered = {};
+  Object.keys(allData).forEach(group => {
+    filtered[group] = allData[group].filter(x =>
+      x.title.toLowerCase().includes(q)
+    );
   });
 
-function render(items) {
-  const grid = document.getElementById('grid');
-  grid.innerHTML = "";
-
-  items.forEach(item => {
-    const el = document.createElement('div');
-    el.className = 'card';
-
-    el.innerHTML = `
-      <img src="${item.poster}" />
-      <div class="title">${item.title}</div>
-    `;
-
-    el.onclick = () => {
-      window.open(item.url, '_blank');
-    };
-
-    grid.appendChild(el);
-  });
-}
-
-function filter() {
-  const q = document.getElementById('search').value.toLowerCase();
-  const filtered = data.filter(x => x.title.toLowerCase().includes(q));
-  render(filtered);
+  renderAll(filtered);
 }
 </script>
 
