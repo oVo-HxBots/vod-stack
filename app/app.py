@@ -6,6 +6,7 @@ from flask import Flask, jsonify, send_file
 from flask import render_template
 import requests
 from guessit import guessit
+from flask import render_template, request
 
 TMDB_KEY = os.getenv("TMDB_KEY")
 BASE_URL = os.getenv("BASE_URL")
@@ -146,6 +147,10 @@ def api():
 @app.route("/")
 def home():
     return render_template("index.html")
+
+@app.route("/player")
+def player():
+    return render_template("player.html")
     
 if __name__ == "__main__":
     scan()
