@@ -151,6 +151,10 @@ def home():
 @app.route("/player")
 def player():
     return render_template("player.html")
+
+@app.route("/admin")
+def admin():
+    return render_template("admin.html")
     
 if __name__ == "__main__":
     scan()
