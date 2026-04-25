@@ -11,9 +11,9 @@ from flask import render_template, request
 import subprocess
 
 TMDB_KEY = os.getenv("TMDB_KEY")
-BASE_URL = "161.118.182.88:8001"
+BASE_URL = "http://161.118.182.88:8001"
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/mnt")
-RCLONE_URL = "161.118.182.88:8001"
+RCLONE_URL = "http://161.118.182.88:8001"
 
 app = Flask(__name__)
 db = {}
