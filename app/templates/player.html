@@ -13,7 +13,9 @@
 <video controls autoplay id="v"></video>
 
 <script>
-const url = new URLSearchParams(location.search).get("url")
+const encoded = new URLSearchParams(location.search).get("url")
+const url = atob(encoded)
+
 document.getElementById("v").src = url
 </script>
 
