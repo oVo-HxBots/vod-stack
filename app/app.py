@@ -13,7 +13,7 @@ BASE_URL = os.getenv("BASE_URL")
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/mnt")
 
 app = Flask(__name__)
-db = {}
+db = {"movies": [], "series": []}
 
 
 def tmdb_search(title, year=None, is_series=False):
