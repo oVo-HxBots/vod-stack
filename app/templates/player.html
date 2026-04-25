@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Player</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+  <style>
+    body {
+      background: black;
+      margin: 0;
+    }
+
+    video {
+      width: 100%;
+      height: 100vh;
+    }
+  </style>
+</head>
+
+<body>
+
+<video id="video" controls autoplay></video>
+
+<script>
+const url = new URLSearchParams(window.location.search).get("url");
+const video = document.getElementById("video");
+
+if (url.endsWith(".m3u8")) {
+  if (Hls.isSupported()) {
+    const hls = new Hls();
+    hls.loadSource(url);
+    hls.attachMedia(video);
+  } else {
+    video.src = url;
+  }
+} else {
+  video.src = url;
+}
+</script>
+
+</body>
+</html>
