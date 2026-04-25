@@ -1,153 +1,45 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>VOD Stack</title>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-
+  <title>VOD</title>
   <style>
-    body {
-      background: #141414;
-      color: white;
-      font-family: Arial;
-      margin: 0;
-    }
-
-    header {
-      padding: 15px;
-      background: black;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    input {
-      padding: 8px;
-      border-radius: 4px;
-      border: none;
-      width: 200px;
-    }
-
-    .row {
-      margin: 20px;
-    }
-
-    .scroll {
-      display: flex;
-      overflow-x: auto;
-      gap: 10px;
-    }
-
-    .card {
-      position: relative;
-      min-width: 160px;
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
-
-    .card:hover {
-      transform: scale(1.1);
-      z-index: 10;
-    }
-
-    .card img {
-      width: 160px;
-      border-radius: 6px;
-    }
-
-    .overlay {
-      position: absolute;
-      bottom: 0;
-      background: rgba(0,0,0,0.8);
-      width: 100%;
-      padding: 5px;
-      font-size: 12px;
-      display: none;
-    }
-
-    .card:hover .overlay {
-      display: block;
-    }
-
-    .play {
-      margin-top: 5px;
-      padding: 4px;
-      background: red;
-      text-align: center;
-      border-radius: 3px;
-    }
+    body { background:#141414; color:white; font-family:Arial; margin:0 }
+    header { padding:15px; background:black }
+    .row { margin:20px }
+    .scroll { display:flex; overflow-x:auto; gap:10px }
+    .card { min-width:150px; cursor:pointer }
+    .card img { width:150px; border-radius:5px }
   </style>
 </head>
 
 <body>
 
-<header>
-  <div>🎬 VOD Stack</div>
-  <input placeholder="Search..." onkeyup="search(this.value)">
-</header>
+<header>🎬 VOD</header>
 
 <div id="content"></div>
 
 <script>
-let allData = [];
-
 fetch('/api')
-  .then(r => r.json())
-  .then(data => {
-    allData = data;
-    renderAll(data);
-  });
+  .then(r=>r.json())
+  .then(data=>{
+    Object.keys(data).forEach(cat=>{
+      const row = document.createElement('div')
+      row.className='row'
 
-function renderAll(data) {
-  document.getElementById("content").innerHTML = "";
+      row.innerHTML = `<h2>${cat}</h2><div class="scroll"></div>`
+      const scroll = row.querySelector('.scroll')
 
-  Object.keys(data).forEach(group => {
-    renderRow(group, data[group]);
-  });
-}
+      data[cat].forEach(item=>{
+        const c = document.createElement('div')
+        c.className='card'
+        c.innerHTML = `<img src="${item.poster}">`
+        c.onclick = ()=> window.location="/player?url="+encodeURIComponent(item.url)
+        scroll.appendChild(c)
+      })
 
-function renderRow(title, items) {
-  const container = document.getElementById('content');
-
-  const row = document.createElement('div');
-  row.className = 'row';
-
-  row.innerHTML = `<h2>${title}</h2><div class="scroll"></div>`;
-  const scroll = row.querySelector('.scroll');
-
-  items.forEach(item => {
-    const card = document.createElement('div');
-    card.className = 'card';
-
-    card.innerHTML = `
-      <img src="${item.poster}">
-      <div class="overlay">
-        ${item.title}
-        <div class="play">▶ Play</div>
-      </div>
-    `;
-
-    card.onclick = () => {
-      window.location = "/player?url=" + encodeURIComponent(item.url);
-    };
-
-    scroll.appendChild(card);
-  });
-
-  container.appendChild(row);
-}
-
-function search(q) {
-  q = q.toLowerCase();
-
-  const filtered = {};
-  Object.keys(allData).forEach(group => {
-    filtered[group] = allData[group].filter(x =>
-      x.title.toLowerCase().includes(q)
-    );
-  });
-
-  renderAll(filtered);
-}
+      document.getElementById('content').appendChild(row)
+    })
+  })
 </script>
 
 </body>
