@@ -76,7 +76,8 @@ fetch('/api')
         `
 
         card.onclick = () => {
-          window.location = "/player?url=" + encodeURIComponent(item.url)
+  const encoded = btoa(item.url)
+  window.location = "/player?url=" + encoded
         }
 
         scroll.appendChild(card)
