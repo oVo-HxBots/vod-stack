@@ -2,6 +2,8 @@
 <html>
 <head>
   <title>VOD Stack</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
   <style>
     body {
       background: #141414;
@@ -13,28 +15,87 @@
     header {
       padding: 15px;
       font-size: 22px;
-      font-weight: bold;
-      background: #000;
+      background: black;
     }
 
-    .search {
-      padding: 10px;
-      width: 100%;
-      border: none;
-      outline: none;
-      font-size: 16px;
+    .row {
+      margin: 20px;
     }
 
-    .container {
-      padding: 20px;
+    .row h2 {
+      margin-bottom: 10px;
     }
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: 15px;
+    .scroll {
+      display: flex;
+      overflow-x: auto;
+      gap: 10px;
     }
 
+    .card {
+      min-width: 150px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .card:hover {
+      transform: scale(1.1);
+    }
+
+    .card img {
+      width: 150px;
+      border-radius: 5px;
+    }
+
+    .scroll::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>🎬 VOD Stack</header>
+
+<div id="content"></div>
+
+<script>
+fetch('/api')
+  .then(res => res.json())
+  .then(data => {
+    renderCategory("Movies", data.movies);
+    renderCategory("Series", data.series);
+  });
+
+function renderCategory(title, items) {
+  const container = document.getElementById('content');
+
+  const row = document.createElement('div');
+  row.className = 'row';
+
+  row.innerHTML = `<h2>${title}</h2><div class="scroll"></div>`;
+
+  const scroll = row.querySelector('.scroll');
+
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    card.innerHTML = `<img src="${item.poster}" />`;
+
+    card.onclick = () => {
+      window.location = "/player?url=" + encodeURIComponent(item.url);
+    };
+
+    scroll.appendChild(card);
+  });
+
+  container.appendChild(row);
+}
+</script>
+
+</body>
+</html>
     .card {
       cursor: pointer;
       transition: transform 0.2s;
