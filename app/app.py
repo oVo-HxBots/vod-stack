@@ -144,8 +144,8 @@ def generate_m3u():
     for group, items in db_cache.items():
         for item in items:
             lines.append(
-                f'#EXTINF:-1 tvg-logo="{item["poster"]}" group-title="{group}",{item["title"]}'
-            )
+    f'#EXTINF:-1 tvg-logo="{item["poster"]}" group-title="{group}",{item["title"]}'
+)
             lines.append(item["url"])
 
     with open("playlist.m3u", "w") as f:
