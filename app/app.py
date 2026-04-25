@@ -1,113 +1,152 @@
-# copyright @oVo-HxBots
+# Copyright @oVo-HxBots
 
-import requests
+from flask import Flask, request, jsonify, render_template, send_file
+import mysql.connector
+import time, os, datetime, requests
 from bs4 import BeautifulSoup
-import os, datetime
-from flask import Flask, jsonify, send_file
-from flask import render_template
-import requests
 from guessit import guessit
-from flask import render_template, request
-import subprocess
-
-TMDB_KEY = os.getenv("TMDB_KEY")
-BASE_URL = "http://161.118.182.88:8001"
-MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/mnt")
-RCLONE_URL = "http://161.118.182.88:8001"
 
 app = Flask(__name__)
-db = {}
 
+# CONFIG
+BASE_URL = "os.getenv("BASE_URL")
+DB_HOST = "os.getenv("DB_HOST")
+DB_USER = "os.getenv("DB_USER")
+DB_PASS = "os.getenv("DB_PASS")
+DB_NAME = "os.getenv("DB_NAME")
+TMDB_KEY = os.getenv("TMDB_KEY")
 
-def tmdb_search(title, year=None, is_series=False):
-    url = f"https://api.themoviedb.org/3/search/{'tv' if is_series else 'movie'}"
-    params = {"api_key": TMDB_KEY, "query": title}
-    if year:
-        params["year"] = year
+db_cache = {}
+
+# ---------------- DB ----------------
+
+def db():
+    return mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASS,
+        database=DB_NAME
+    )
+
+def init_db():
+    conn = db()
+    c = conn.cursor()
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(50) UNIQUE,
+        password VARCHAR(50),
+        max_conn INT,
+        expires BIGINT
+    )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# ---------------- TMDB ----------------
+
+def tmdb(title):
     try:
-        r = requests.get(url, params=params, timeout=10).json()
-        return r["results"][0] if r.get("results") else None
+        r = requests.get(
+            "https://api.themoviedb.org/3/search/multi",
+            params={"api_key": TMDB_KEY, "query": title}
+        ).json()
+
+        if r.get("results"):
+            d = r["results"][0]
+            poster = ""
+            if d.get("poster_path"):
+                poster = "https://image.tmdb.org/t/p/w500" + d["poster_path"]
+
+            return {
+                "title": d.get("title") or d.get("name"),
+                "overview": d.get("overview", ""),
+                "poster": poster
+            }
     except:
-        return None
+        pass
+
+    return {"title": title, "overview": "", "poster": ""}
+
+# ---------------- SCAN ----------------
 
 def scan():
-    global db
-    db = {}
+    global db_cache
+    db_cache = {}
 
-    base_url = BASE_URL  # http://161.118.182.88:8001
+    r = requests.get(BASE_URL)
+    soup = BeautifulSoup(r.text, "html.parser")
 
-    categories = ["movies"]  # add "series", "4k" later
+    for link in soup.find_all("a"):
+        href = link.get("href")
 
-    for category in categories:
-        url = f"{base_url}/{category}/"
-
-        try:
-            r = requests.get(url)
-        except:
+        if not href or href == "../":
             continue
 
-        soup = BeautifulSoup(r.text, "html.parser")
+        category = href.strip("/")
+        db_cache[category] = []
 
-        db[category] = []
+        cat_url = f"{BASE_URL}/{category}/"
 
-        for link in soup.find_all("a"):
-            href = link.get("href")
+        r2 = requests.get(cat_url)
+        soup2 = BeautifulSoup(r2.text, "html.parser")
 
-            if not href or href == "../":
+        for item in soup2.find_all("a"):
+            sub = item.get("href")
+            if not sub or sub == "../":
                 continue
 
-            # folder inside movies
-            movie_folder = href.strip("/")
-
-            movie_url = f"{url}{movie_folder}/"
+            folder = sub.strip("/")
+            folder_url = f"{cat_url}{folder}/"
 
             try:
-                r2 = requests.get(movie_url)
-                soup2 = BeautifulSoup(r2.text, "html.parser")
+                r3 = requests.get(folder_url)
+                soup3 = BeautifulSoup(r3.text, "html.parser")
 
-                for file_link in soup2.find_all("a"):
-                    fhref = file_link.get("href")
+                for f in soup3.find_all("a"):
+                    file = f.get("href")
 
-                    if fhref.endswith(".mkv") or fhref.endswith(".mp4"):
-                        file_url = f"{movie_url}{fhref}"
+                    if file.endswith((".mkv", ".mp4")):
+                        file_url = f"{folder_url}{file}"
 
-                        db[category].append({
-                            "title": movie_folder,
+                        meta = tmdb(folder)
+
+                        db_cache[category].append({
+                            "title": meta["title"],
                             "url": file_url,
-                            "poster": "",
-                            "overview": ""
+                            "poster": meta["poster"],
+                            "overview": meta["overview"]
                         })
-
             except:
                 continue
 
-    print("DB:", db)
+    print("SCAN DONE:", len(db_cache))
 
+# ---------------- PLAYLIST ----------------
 
 def generate_m3u():
     lines = ["#EXTM3U"]
 
-    for group, items in db.items():
+    for group, items in db_cache.items():
         for item in items:
-            name = item["title"]
-
-            if item.get("season") and item.get("episode"):
-                name = f'{name} S{item["season"]}E{item["episode"]}'
-
             lines.append(
-                f'#EXTINF:-1 tvg-logo="{item["poster"]}" group-title="{group.upper()}",{name}'
+                f'#EXTINF:-1 tvg-logo="{item["poster"]}" group-title="{group}",{item["title"]}'
             )
             lines.append(item["url"])
 
-    with open("/app/playlist.m3u", "w") as f:
+    with open("playlist.m3u", "w") as f:
         f.write("\n".join(lines))
+
+# ---------------- EPG ----------------
 
 def generate_epg():
     now = datetime.datetime.utcnow()
     xml = ['<?xml version="1.0" encoding="UTF-8"?><tv>']
 
     i = 0
-    for group, items in db.items():
+    for group, items in db_cache.items():
         for item in items:
             start = now.strftime("%Y%m%d%H%M%S +0000")
             end = (now + datetime.timedelta(hours=2)).strftime("%Y%m%d%H%M%S +0000")
@@ -123,91 +162,77 @@ def generate_epg():
 
     xml.append("</tv>")
 
-    with open("/app/epg.xml", "w") as f:
+    with open("epg.xml", "w") as f:
         f.write("\n".join(xml))
+
+# ---------------- ROUTES ----------------
 
 @app.route("/scan")
 def rescan():
     scan()
     generate_m3u()
     generate_epg()
-    return jsonify({"status":"updated"})
+    return {"status": "updated", "items": sum(len(v) for v in db_cache.values())}
 
 @app.route("/playlist.m3u")
 def playlist():
-    return send_file("/app/playlist.m3u")
+    return send_file("playlist.m3u")
 
 @app.route("/epg.xml")
 def epg():
-    return send_file("/app/epg.xml")
+    return send_file("epg.xml")
 
 @app.route("/api")
 def api():
-    return jsonify(db)
+    return jsonify(db_cache)
+
+# ---------------- USERS ----------------
+
+@app.route("/admin/user/add", methods=["POST"])
+def add_user():
+    data = request.json
+    conn = db()
+    c = conn.cursor()
+
+    c.execute(
+        "INSERT INTO users (username,password,max_conn,expires) VALUES (%s,%s,%s,%s)",
+        (data["username"], data["password"], data["max_conn"], data["expires"])
+    )
+
+    conn.commit()
+    conn.close()
+    return {"status": "added"}
+
+@app.route("/auth")
+def auth():
+    u = request.args.get("username")
+    p = request.args.get("password")
+
+    conn = db()
+    c = conn.cursor()
+
+    c.execute("SELECT password,expires FROM users WHERE username=%s", (u,))
+    user = c.fetchone()
+
+    conn.close()
+
+    if not user or user[0] != p or user[1] < int(time.time()):
+        return {"auth": 0}
+
+    return {"auth": 1}
+
+# ---------------- UI ----------------
 
 @app.route("/")
 def home():
     return render_template("index.html")
 
-@app.route("/player")
-def player():
-    return render_template("player.html")
-
 @app.route("/admin")
 def admin():
     return render_template("admin.html")
 
-@app.route("/admin/scan")
-def admin_scan():
-    scan()
-    return {"status": "scan complete", "items": sum(len(v) for v in db.values())}
+# ---------------- START ----------------
 
-
-@app.route("/admin/cache/clear")
-def clear_cache():
-    cache.clear()
-    return {"status": "cache cleared"}
-
-
-@app.route("/admin/stats")
-def stats():
-    return {
-        "categories": {k: len(v) for k, v in db.items()},
-        "total": sum(len(v) for v in db.values())
-    }
-
-
-@app.route("/admin/rclone/start")
-def rclone_start():
-    try:
-        subprocess.Popen([
-            "rclone", "serve", "http", "union:",
-            "--addr", ":8001",
-            "--read-only",
-            "--buffer-size", "0"
-        ])
-        return {"status": "rclone started"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-@app.route("/admin/rclone/stop")
-def rclone_stop():
-    try:
-        subprocess.run(["pkill", "-f", "rclone serve"])
-        return {"status": "rclone stopped"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-@app.route("/admin/rclone/status")
-def rclone_status():
-    try:
-        result = subprocess.check_output(["pgrep", "-f", "rclone serve"])
-        return {"running": True}
-    except:
-        return {"running": False}
-    
 if __name__ == "__main__":
     scan()
     generate_m3u()
