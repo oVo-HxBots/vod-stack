@@ -14,11 +14,11 @@ MAX_TOKEN_LIFETIME = 3600  # 1 hour
 app = Flask(__name__)
 
 # CONFIG
-BASE_URL = "os.getenv("BASE_URL")
-DB_HOST = "os.getenv("DB_HOST")
-DB_USER = "os.getenv("DB_USER")
-DB_PASS = "os.getenv("DB_PASS")
-DB_NAME = "os.getenv("DB_NAME")
+BASE_URL = os.getenv("BASE_URL")
+DB_HOST = os.getenv("DB_HOST")
+DB_USER = os.getenv("DB_USER")
+DB_PASS = os.getenv("DB_PASS")
+DB_NAME = os.getenv("DB_NAME")
 TMDB_KEY = os.getenv("TMDB_KEY")
 
 db_cache = {}
