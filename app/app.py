@@ -3,6 +3,7 @@
 
 import os, datetime
 from flask import Flask, jsonify, send_file
+from flask import render_template
 import requests
 from guessit import guessit
 
@@ -144,8 +145,8 @@ def api():
 
 @app.route("/")
 def home():
-    return "<h2>VOD Server Running</h2><a href='/scan'>Rescan</a>"
-
+    return render_template("index.html")
+    
 if __name__ == "__main__":
     scan()
     generate_m3u()
