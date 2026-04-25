@@ -11,6 +11,7 @@ from flask import render_template, request
 TMDB_KEY = os.getenv("TMDB_KEY")
 BASE_URL = os.getenv("BASE_URL")
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/mnt")
+RCLONE_URL = "161.118.182.88:8001"
 
 app = Flask(__name__)
 db = {}
@@ -50,7 +51,7 @@ def scan():
 
                 full = os.path.join(root, f)
                 rel = full.replace(base_path, "")
-                url = f"{BASE_URL}/{folder_name}" + rel.replace(" ", "%20")
+                url = f"{RCLONE_URL}/{folder_name}" + rel.replace(" ", "%20")
 
                 info = guessit(f)
                 title = info.get("title", f)
