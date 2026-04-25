@@ -8,6 +8,7 @@ from flask import render_template
 import requests
 from guessit import guessit
 from flask import render_template, request
+import subprocess
 
 TMDB_KEY = os.getenv("TMDB_KEY")
 BASE_URL = "161.118.182.88:8001"
@@ -155,6 +156,57 @@ def player():
 @app.route("/admin")
 def admin():
     return render_template("admin.html")
+
+@app.route("/admin/scan")
+def admin_scan():
+    scan()
+    return {"status": "scan complete", "items": sum(len(v) for v in db.values())}
+
+
+@app.route("/admin/cache/clear")
+def clear_cache():
+    cache.clear()
+    return {"status": "cache cleared"}
+
+
+@app.route("/admin/stats")
+def stats():
+    return {
+        "categories": {k: len(v) for k, v in db.items()},
+        "total": sum(len(v) for v in db.values())
+    }
+
+
+@app.route("/admin/rclone/start")
+def rclone_start():
+    try:
+        subprocess.Popen([
+            "rclone", "serve", "http", "union:",
+            "--addr", ":8001",
+            "--read-only",
+            "--buffer-size", "0"
+        ])
+        return {"status": "rclone started"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.route("/admin/rclone/stop")
+def rclone_stop():
+    try:
+        subprocess.run(["pkill", "-f", "rclone serve"])
+        return {"status": "rclone stopped"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.route("/admin/rclone/status")
+def rclone_status():
+    try:
+        result = subprocess.check_output(["pgrep", "-f", "rclone serve"])
+        return {"running": True}
+    except:
+        return {"running": False}
     
 if __name__ == "__main__":
     scan()
