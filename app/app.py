@@ -5,6 +5,11 @@ import mysql.connector
 import time, os, datetime, requests
 from bs4 import BeautifulSoup
 from guessit import guessit
+import hashlib, time, secrets
+
+active_streams = {}     # token -> {user, start}
+bandwidth = {}          # user -> bytes
+MAX_TOKEN_LIFETIME = 3600  # 1 hour
 
 app = Flask(__name__)
 
@@ -32,13 +37,14 @@ def init_db():
     conn = db()
     c = conn.cursor()
     c.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(50) UNIQUE,
-        password VARCHAR(50),
-        max_conn INT,
-        expires BIGINT
-    )
+    CREATE TABLE IF NOT EXISTS tokens (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  token VARCHAR(64) UNIQUE,
+  username VARCHAR(50),
+  created BIGINT,
+  expires BIGINT,
+  active INT DEFAULT 1
+);
     """)
     conn.commit()
     conn.close()
@@ -231,6 +237,93 @@ def home():
 def admin():
     return render_template("admin.html")
 
+@app.route("/play")
+def play():
+    u = request.args.get("username")
+    p = request.args.get("password")
+    path = request.args.get("path")  # e.g. movies/movie.mkv
+
+    conn = db()
+    c = conn.cursor()
+
+    c.execute("SELECT password,expires,max_conn,status FROM users WHERE username=%s", (u,))
+    user = c.fetchone()
+    conn.close()
+
+    if not user or user[0] != p or user[3] == 0 or user[1] < int(time.time()):
+        return {"error": "auth failed"}, 403
+
+    # connection limit (per user, REAL)
+    current = sum(1 for t in active_streams.values() if t["user"] == u)
+    if current >= user[2]:
+        return {"error": "max connections reached"}, 403
+
+    token = secrets.token_hex(16)
+
+    conn = db()
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO tokens (token,username,created,expires) VALUES (%s,%s,%s,%s)",
+        (token, u, int(time.time()), int(time.time()) + MAX_TOKEN_LIFETIME)
+    )
+    conn.commit()
+    conn.close()
+
+    active_streams[token] = {"user": u, "start": time.time()}
+
+    return {
+        "url": f"/stream/{path}?token={token}"
+    }
+
+
+@app.route("/validate_token")
+def validate_token():
+    token = request.args.get("token")
+
+    conn = db()
+    c = conn.cursor()
+    c.execute("SELECT username,expires FROM tokens WHERE token=%s AND active=1", (token,))
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        return "", 403
+
+    if row[1] < int(time.time()):
+        return "", 403
+
+    return "", 200
+
+
+@app.route("/stream_end")
+def stream_end():
+    token = request.args.get("token")
+
+    if token in active_streams:
+        user = active_streams[token]["user"]
+        active_streams.pop(token)
+
+    conn = db()
+    c = conn.cursor()
+    c.execute("UPDATE tokens SET active=0 WHERE token=%s", (token,))
+    conn.commit()
+    conn.close()
+
+    return {"status": "ended"}
+
+@app.route("/admin/streams")
+def streams():
+    return {
+        "active": len(active_streams),
+        "users": active_streams
+    }
+
+@app.route("/admin/bandwidth")
+def bw():
+    return bandwidth
+
+    
+    
 # ---------------- START ----------------
 
 if __name__ == "__main__":
