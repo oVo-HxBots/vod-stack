@@ -10,14 +10,9 @@
 
 <body>
 
-<video controls autoplay id="v"></video>
-
-<script>
-const encoded = new URLSearchParams(location.search).get("url")
-const url = atob(encoded)
-
-document.getElementById("v").src = url
-</script>
+<video controls autoplay>
+  <source src="{{ video_url }}" type="video/mp4">
+</video>
 
 </body>
 </html>
