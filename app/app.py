@@ -10,6 +10,7 @@ import hashlib, time, secrets
 active_streams = {}     # token -> {user, start}
 bandwidth = {}          # user -> bytes
 MAX_TOKEN_LIFETIME = 3600  # 1 hour
+tmdb_cache = {}
 
 app = Flask(__name__)
 
@@ -82,55 +83,59 @@ def scan():
     global db_cache
     db_cache = {}
 
-    r = requests.get(BASE_URL)
-    soup = BeautifulSoup(r.text, "html.parser")
+    MEDIA_ROOT = "/mnt"
 
-    for link in soup.find_all("a"):
-        href = link.get("href")
+    for drive in os.listdir(MEDIA_ROOT):
+        drive_path = os.path.join(MEDIA_ROOT, drive)
 
-        if not href or href == "../":
+        if not os.path.isdir(drive_path):
             continue
 
-        category = href.strip("/")
-        db_cache[category] = []
+        media_path = os.path.join(drive_path, "media")
 
-        cat_url = f"{BASE_URL}/{category}/"
+        if not os.path.exists(media_path):
+            continue
 
-        r2 = requests.get(cat_url)
-        soup2 = BeautifulSoup(r2.text, "html.parser")
+        # categories like movies, series, anime
+        for category in os.listdir(media_path):
+            category_path = os.path.join(media_path, category)
 
-        for item in soup2.find_all("a"):
-            sub = item.get("href")
-            if not sub or sub == "../":
+            if not os.path.isdir(category_path):
                 continue
 
-            folder = sub.strip("/")
-            folder_url = f"{cat_url}{folder}/"
+            if category not in db_cache:
+                db_cache[category] = []
 
-            try:
-                r3 = requests.get(folder_url)
-                soup3 = BeautifulSoup(r3.text, "html.parser")
+            for root, _, files in os.walk(category_path):
+                for f in files:
+                    if not f.lower().endswith((".mkv", ".mp4", ".ts")):
+                        continue
 
-                for f in soup3.find_all("a"):
-                    file = f.get("href")
+                    full_path = os.path.join(root, f)
 
-                    if file.endswith((".mkv", ".mp4")):
-                        file_url = f"{folder_url}{file}"
+                    # convert local path → URL path
+                    rel = full_path.split("media", 1)[-1]
 
-                        meta = tmdb(folder)
+                    file_url = f"{BASE_URL}{rel.replace(' ', '%20')}"
 
-                        db_cache[category].append({
-                            "title": meta["title"],
-                            "url": file_url,
-                            "poster": meta["poster"],
-                            "overview": meta["overview"]
-                        })
-            except:
-                continue
+                    # use folder name (better for Radarr)
+                    folder_name = os.path.basename(os.path.dirname(full_path))
+                    if folder_name in tmdb_cache:
+                       meta = tmdb_cache[folder_name]
+                    else:
+                       meta = tmdb(folder_name)
+                       tmdb_cache[folder_name] = meta
+                    
 
-    print("SCAN DONE:", len(db_cache))
+                    db_cache[category].append({
+                        "title": meta["title"],
+                        "url": file_url,
+                        "poster": meta["poster"],
+                        "overview": meta["overview"]
+                    })
 
-# ---------------- PLAYLIST ----------------
+    print("SCAN DONE:", sum(len(v) for v in db_cache.values()))
+
 
 def generate_m3u():
     lines = ["#EXTM3U"]
