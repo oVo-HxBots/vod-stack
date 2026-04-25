@@ -2,37 +2,19 @@
 <html>
 <head>
   <title>Player</title>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-
   <style>
-    body { margin: 0; background: black; }
-    video { width: 100%; height: 100vh; }
+    body { margin:0; background:black }
+    video { width:100%; height:100vh }
   </style>
 </head>
 
 <body>
 
-<video id="video" controls autoplay></video>
+<video controls autoplay id="v"></video>
 
 <script>
-const params = new URLSearchParams(window.location.search);
-const url = params.get("url");
-
-const video = document.getElementById("video");
-
-if (url.endsWith(".m3u8")) {
-  if (Hls.isSupported()) {
-    const hls = new Hls({
-      maxBufferLength: 30
-    });
-    hls.loadSource(url);
-    hls.attachMedia(video);
-  } else {
-    video.src = url;
-  }
-} else {
-  video.src = url;
-}
+const url = new URLSearchParams(location.search).get("url")
+document.getElementById("v").src = url
 </script>
 
 </body>
