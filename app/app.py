@@ -15,10 +15,6 @@ MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/mnt")
 app = Flask(__name__)
 db = {}
 
-if folder_name not in db:
-    db[folder_name] = []
-
-db[folder_name].append(item)
 
 def tmdb_search(title, year=None, is_series=False):
     url = f"https://api.themoviedb.org/3/search/{'tv' if is_series else 'movie'}"
@@ -30,12 +26,10 @@ def tmdb_search(title, year=None, is_series=False):
         return r["results"][0] if r.get("results") else None
     except:
         return None
-
 def scan():
     global db
-    db = {"movies": [], "series": []}
+    db = {}
 
-    # auto-detect all folders in /mnt
     media_paths = [
         os.path.join(MEDIA_ROOT, d)
         for d in os.listdir(MEDIA_ROOT)
@@ -45,9 +39,13 @@ def scan():
     for base_path in media_paths:
         folder_name = os.path.basename(base_path)
 
+        # create group if not exists
+        if folder_name not in db:
+            db[folder_name] = []
+
         for root, _, files in os.walk(base_path):
             for f in files:
-                if not f.lower().endswith((".mkv",".mp4",".ts")):
+                if not f.lower().endswith((".mkv", ".mp4", ".ts")):
                     continue
 
                 full = os.path.join(root, f)
@@ -69,7 +67,7 @@ def scan():
 
                 if tmdb:
                     name = tmdb.get("name") if is_series else tmdb.get("title")
-                    overview = tmdb.get("overview","")
+                    overview = tmdb.get("overview", "")
                     if tmdb.get("poster_path"):
                         poster = "https://image.tmdb.org/t/p/w500" + tmdb["poster_path"]
 
@@ -78,15 +76,11 @@ def scan():
                     "url": url,
                     "poster": poster,
                     "overview": overview,
-                    "group": folder_name.upper(),
                     "season": season,
                     "episode": episode
                 }
 
-                if is_series:
-                    db["series"].append(item)
-                else:
-                    db["movies"].append(item)
+                db[folder_name].append(item)
 
 def generate_m3u():
     lines = ["#EXTM3U"]
@@ -151,11 +145,11 @@ def api():
 
 @app.route("/")
 def home():
-    return render_template("/app/templates/index.html")
+    return render_template("index.html")
 
 @app.route("/player")
 def player():
-    return render_template("/app/templates/player.html")
+    return render_template("player.html")
     
 if __name__ == "__main__":
     scan()
