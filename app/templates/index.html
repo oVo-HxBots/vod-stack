@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>VOD Stack</title>
+  <style>
+    body {
+      background: #141414;
+      color: white;
+      font-family: Arial;
+      margin: 0;
+    }
+
+    header {
+      padding: 15px;
+      font-size: 22px;
+      font-weight: bold;
+      background: #000;
+    }
+
+    .search {
+      padding: 10px;
+      width: 100%;
+      border: none;
+      outline: none;
+      font-size: 16px;
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 15px;
+    }
+
+    .card {
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .card:hover {
+      transform: scale(1.05);
+    }
+
+    .card img {
+      width: 100%;
+      border-radius: 6px;
+    }
+
+    .title {
+      font-size: 14px;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>🎬 VOD Stack</header>
+
+<input class="search" placeholder="Search..." onkeyup="filter()" id="search">
+
+<div class="container">
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+let data = [];
+
+fetch('/api')
+  .then(res => res.json())
+  .then(json => {
+    data = [...json.movies, ...json.series];
+    render(data);
+  });
+
+function render(items) {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = "";
+
+  items.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'card';
+
+    el.innerHTML = `
+      <img src="${item.poster}" />
+      <div class="title">${item.title}</div>
+    `;
+
+    el.onclick = () => {
+      window.open(item.url, '_blank');
+    };
+
+    grid.appendChild(el);
+  });
+}
+
+function filter() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtered = data.filter(x => x.title.toLowerCase().includes(q));
+  render(filtered);
+}
+</script>
+
+</body>
+</html>
