@@ -6,6 +6,7 @@ import time, os, datetime, requests
 from bs4 import BeautifulSoup
 from guessit import guessit
 import hashlib, time, secrets
+from urllib.parse import quote
 
 active_streams = {}     # token -> {user, start}
 bandwidth = {}          # user -> bytes
@@ -116,7 +117,7 @@ def scan():
                     # convert local path → URL path
                     rel = full_path.split("media", 1)[-1]
 
-                    file_url = f"{BASE_URL}{rel.replace(' ', '%20')}"
+                    file_url = f"{BASE_URL}{quote(rel)}"
 
                     # use folder name (better for Radarr)
                     folder_name = os.path.basename(os.path.dirname(full_path))
