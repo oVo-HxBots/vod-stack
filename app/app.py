@@ -13,7 +13,7 @@ BASE_URL = os.getenv("BASE_URL")
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/mnt")
 
 app = Flask(__name__)
-db = {"movies": [], "series": []}
+db = {}
 
 
 def tmdb_search(title, year=None, is_series=False):
@@ -81,24 +81,23 @@ def scan():
                 }
 
                 db[folder_name].append(item)
-
+                
 def generate_m3u():
     lines = ["#EXTM3U"]
 
-    for m in db["movies"]:
-        lines.append(
-            f'#EXTINF:-1 tvg-logo="{m["poster"]}" group-title="{m["group"]}",{m["title"]}'
-        )
-        lines.append(m["url"])
+    for group, items in db.items():
+        for item in items:
+            name = item["title"]
 
-    for s in db["series"]:
-        name = f'{s["title"]} S{s["season"]}E{s["episode"]}'
-        lines.append(
-            f'#EXTINF:-1 tvg-logo="{s["poster"]}" group-title="{s["group"]}",{name}'
-        )
-        lines.append(s["url"])
+            if item.get("season") and item.get("episode"):
+                name = f'{name} S{item["season"]}E{item["episode"]}'
 
-    with open("/app/playlist.m3u","w") as f:
+            lines.append(
+                f'#EXTINF:-1 tvg-logo="{item["poster"]}" group-title="{group.upper()}",{name}'
+            )
+            lines.append(item["url"])
+
+    with open("/app/playlist.m3u", "w") as f:
         f.write("\n".join(lines))
 
 def generate_epg():
@@ -106,22 +105,23 @@ def generate_epg():
     xml = ['<?xml version="1.0" encoding="UTF-8"?><tv>']
 
     i = 0
-    for item in db["movies"] + db["series"]:
-        start = now.strftime("%Y%m%d%H%M%S +0000")
-        end = (now + datetime.timedelta(hours=2)).strftime("%Y%m%d%H%M%S +0000")
+    for group, items in db.items():
+        for item in items:
+            start = now.strftime("%Y%m%d%H%M%S +0000")
+            end = (now + datetime.timedelta(hours=2)).strftime("%Y%m%d%H%M%S +0000")
 
-        xml.append(f"""
-        <programme start="{start}" stop="{end}" channel="ch{i}">
-            <title>{item["title"]}</title>
-            <desc>{item["overview"]}</desc>
-            <icon src="{item["poster"]}"/>
-        </programme>
-        """)
-        i += 1
+            xml.append(f"""
+            <programme start="{start}" stop="{end}" channel="ch{i}">
+                <title>{item["title"]}</title>
+                <desc>{item["overview"]}</desc>
+                <icon src="{item["poster"]}"/>
+            </programme>
+            """)
+            i += 1
 
     xml.append("</tv>")
 
-    with open("/app/epg.xml","w") as f:
+    with open("/app/epg.xml", "w") as f:
         f.write("\n".join(xml))
 
 @app.route("/scan")
