@@ -9,7 +9,7 @@ from guessit import guessit
 from flask import render_template, request
 
 TMDB_KEY = os.getenv("TMDB_KEY")
-BASE_URL = os.getenv("BASE_URL")
+BASE_URL = "161.118.182.88:8001"
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/mnt")
 RCLONE_URL = "161.118.182.88:8001"
 
@@ -27,61 +27,53 @@ def tmdb_search(title, year=None, is_series=False):
         return r["results"][0] if r.get("results") else None
     except:
         return None
+
 def scan():
     global db
     db = {}
 
-    media_paths = [
-        os.path.join(MEDIA_ROOT, d)
-        for d in os.listdir(MEDIA_ROOT)
-        if os.path.isdir(os.path.join(MEDIA_ROOT, d))
-    ]
+    for drive in os.listdir(MEDIA_ROOT):
+        drive_path = os.path.join(MEDIA_ROOT, drive)
 
-    for base_path in media_paths:
-        folder_name = os.path.basename(base_path)
+        if not os.path.isdir(drive_path):
+            continue
 
-        # create group if not exists
-        if folder_name not in db:
-            db[folder_name] = []
+        media_path = os.path.join(drive_path, "media")
 
-        for root, _, files in os.walk(base_path):
+        if not os.path.exists(media_path):
+            continue
+
+        for root, _, files in os.walk(media_path):
             for f in files:
                 if not f.lower().endswith((".mkv", ".mp4", ".ts")):
                     continue
 
                 full = os.path.join(root, f)
-                rel = full.replace(base_path, "")
-                url = f"{RCLONE_URL}/{folder_name}" + rel.replace(" ", "%20")
+
+                # Extract path after /media
+                rel = full.split("media", 1)[-1]
+
+                url = f"{BASE_URL}" + rel.replace(" ", "%20")
 
                 info = guessit(f)
-                title = info.get("title", f)
-                year = info.get("year")
-                season = info.get("season")
-                episode = info.get("episode")
+                folder = os.path.basename(os.path.dirname(full))
+                title = folder
 
-                is_series = season is not None
-                tmdb = tmdb_search(title, year, is_series)
+                # Determine category (movies / series / etc.)
+                parts = rel.strip("/").split("/")
+                category = parts[0] if len(parts) > 0 else "other"
 
-                poster = ""
-                overview = ""
-                name = title
-
-                if tmdb:
-                    name = tmdb.get("name") if is_series else tmdb.get("title")
-                    overview = tmdb.get("overview", "")
-                    if tmdb.get("poster_path"):
-                        poster = "https://image.tmdb.org/t/p/w500" + tmdb["poster_path"]
+                if category not in db:
+                    db[category] = []
 
                 item = {
-                    "title": name,
+                    "title": title,
                     "url": url,
-                    "poster": poster,
-                    "overview": overview,
-                    "season": season,
-                    "episode": episode
+                    "poster": "",
+                    "overview": ""
                 }
 
-                db[folder_name].append(item)
+                db[category].append(item)
                 
 def generate_m3u():
     lines = ["#EXTM3U"]
