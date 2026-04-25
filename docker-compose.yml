@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  vod:
+    image: python:3.11-slim
+    container_name: vod_server
+    volumes:
+      - ./app:/app
+      - /mnt:/mnt
+    working_dir: /app
+    env_file:
+      - .env
+    command: bash -c "pip install -r requirements.txt && python app.py"
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    container_name: vod_nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - /mnt:/mnt
+    ports:
+      - "8081:80"
+    depends_on:
+      - vod
+    restart: always
