@@ -146,11 +146,11 @@ def api():
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return render_template("/app/templates/index.html")
 
 @app.route("/player")
 def player():
-    return render_template("player.html")
+    return render_template("/app/templates/player.html")
     
 if __name__ == "__main__":
     scan()
