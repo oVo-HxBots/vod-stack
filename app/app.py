@@ -1,6 +1,7 @@
 # copyright @oVo-HxBots
 
-
+import requests
+from bs4 import BeautifulSoup
 import os, datetime
 from flask import Flask, jsonify, send_file
 from flask import render_template
@@ -32,49 +33,56 @@ def scan():
     global db
     db = {}
 
-    for drive in os.listdir(MEDIA_ROOT):
-        drive_path = os.path.join(MEDIA_ROOT, drive)
+    base_url = BASE_URL  # http://161.118.182.88:8001
 
-        if not os.path.isdir(drive_path):
+    categories = ["movies"]  # add "series", "4k" later
+
+    for category in categories:
+        url = f"{base_url}/{category}/"
+
+        try:
+            r = requests.get(url)
+        except:
             continue
 
-        media_path = os.path.join(drive_path, "media")
+        soup = BeautifulSoup(r.text, "html.parser")
 
-        if not os.path.exists(media_path):
-            continue
+        db[category] = []
 
-        for root, _, files in os.walk(media_path):
-            for f in files:
-                if not f.lower().endswith((".mkv", ".mp4", ".ts")):
-                    continue
+        for link in soup.find_all("a"):
+            href = link.get("href")
 
-                full = os.path.join(root, f)
+            if not href or href == "../":
+                continue
 
-                # Extract path after /media
-                rel = full.split("media", 1)[-1]
+            # folder inside movies
+            movie_folder = href.strip("/")
 
-                url = f"{BASE_URL}" + rel.replace(" ", "%20")
+            movie_url = f"{url}{movie_folder}/"
 
-                info = guessit(f)
-                folder = os.path.basename(os.path.dirname(full))
-                title = folder
+            try:
+                r2 = requests.get(movie_url)
+                soup2 = BeautifulSoup(r2.text, "html.parser")
 
-                # Determine category (movies / series / etc.)
-                parts = rel.strip("/").split("/")
-                category = parts[0] if len(parts) > 0 else "other"
+                for file_link in soup2.find_all("a"):
+                    fhref = file_link.get("href")
 
-                if category not in db:
-                    db[category] = []
+                    if fhref.endswith(".mkv") or fhref.endswith(".mp4"):
+                        file_url = f"{movie_url}{fhref}"
 
-                item = {
-                    "title": title,
-                    "url": url,
-                    "poster": "",
-                    "overview": ""
-                }
+                        db[category].append({
+                            "title": movie_folder,
+                            "url": file_url,
+                            "poster": "",
+                            "overview": ""
+                        })
 
-                db[category].append(item)
-                
+            except:
+                continue
+
+    print("DB:", db)
+
+
 def generate_m3u():
     lines = ["#EXTM3U"]
 
