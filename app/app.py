@@ -13,7 +13,12 @@ BASE_URL = os.getenv("BASE_URL")
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", "/mnt")
 
 app = Flask(__name__)
-db = {"movies": [], "series": []}
+db = {}
+
+if folder_name not in db:
+    db[folder_name] = []
+
+db[folder_name].append(item)
 
 def tmdb_search(title, year=None, is_series=False):
     url = f"https://api.themoviedb.org/3/search/{'tv' if is_series else 'movie'}"
