@@ -91,7 +91,7 @@ def scan():
         if not os.path.isdir(drive_path):
             continue
 
-        media_path = os.path.join(drive_path, "media")
+        media_path = os.path.join(drive_path, "")
 
         if not os.path.exists(media_path):
             continue
