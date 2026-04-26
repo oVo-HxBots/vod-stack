@@ -14,6 +14,7 @@ active_streams = {}     # token -> {user, start}
 bandwidth = {}          # user -> bytes
 MAX_TOKEN_LIFETIME = 3600  # 1 hour
 tmdb_cache = {}
+lock = threading.Lock()
 
 app = Flask(__name__)
 
@@ -27,7 +28,11 @@ TMDB_KEY = os.getenv("TMDB_KEY")
 ALIST_API = os.getenv("ALIST_API")
 ALIST_PATH = "/Movies"
 
-db_cache = {}
+db_cache = {
+    "movies": [],
+    "series": [],
+    "anime": []
+}
 
 # ---------------- DB ----------------
 
@@ -58,6 +63,44 @@ def init_db():
 init_db()
 
 # ---------------- TMDB ----------------
+
+def detect_category(path):
+    p = path.lower()
+
+    if "anime" in p:
+        return "anime"
+
+    if "season" in p or "s01" in p:
+        return "series"
+
+    return "movies"
+
+
+def tmdb_cached(name):
+    if name in tmdb_cache:
+        return tmdb_cache[name]
+
+    meta = tmdb(name)
+    tmdb_cache[name] = meta
+    return meta
+
+
+def list_dir(path):
+    try:
+        r = requests.post(ALIST_API, json={
+            "path": path,
+            "password": ""
+        }, timeout=10).json()
+
+        if r.get("code") != 200:
+            return []
+
+        return r.get("data", {}).get("content", []) or []
+
+    except:
+        return []
+
+
 
 def tmdb(title):
     try:
@@ -150,6 +193,43 @@ def scan():
                 })
 
     print("SCAN DONE:", len(db_cache["movies"]))
+
+
+
+def scan_folder(path, category):
+    items = list_dir(path)
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        name = item.get("name")
+
+        if item.get("is_dir"):
+            # 🔁 go deeper
+            scan_folder(f"{path}/{name}", category)
+
+        else:
+            if not name.lower().endswith((".mp4", ".mkv")):
+                continue
+
+            rel = f"{path}/{name}"
+            url = f"/stream{quote(rel, safe='/')}"
+
+            # 🧠 detect title from parent folder
+            folder_name = path.split("/")[-1]
+
+            meta = tmdb_cached(folder_name)
+
+            entry = {
+                "title": meta["title"],
+                "url": url,
+                "poster": meta["poster"],
+                "overview": meta["overview"]
+            }
+
+            with lock:
+                db_cache[category].append(entry)
 
 
 def generate_m3u():
