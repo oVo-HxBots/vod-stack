@@ -25,7 +25,7 @@ DB_PASS = os.getenv("DB_PASS")
 DB_NAME = os.getenv("DB_NAME")
 TMDB_KEY = os.getenv("TMDB_KEY")
 ALIST_API = os.getenv("ALIST_API")
-ALIST_PATH = "/movies"
+ALIST_PATH = "/Movies"
 
 db_cache = {}
 
@@ -86,61 +86,63 @@ def tmdb(title):
 
 def scan():
     global db_cache
-    db_cache = {}
+    db_cache = {"movies": []}
 
     def list_dir(path):
         try:
-           r = requests.post(ALIST_API, json={
-               "path": path,
-               "password": ""
-           }, timeout=10)
+            r = requests.post(ALIST_API, json={
+                "path": path,
+                "password": ""
+            }, timeout=10).json()
 
-           data = r.json()
+            if r.get("code") != 200:
+                print("Alist error:", r)
+                return []
 
-           # 🔥 DEBUG (optional)
-           print("ALIST RESPONSE:", data)
-
-           # ❌ handle error
-           if data.get("code") != 200:
-               print("Alist error:", data.get("message"))
-               return []
-
-           return data.get("data", {}).get("content", [])
+            return r.get("data", {}).get("content", [])
 
         except Exception as e:
-           print("LIST_DIR ERROR:", str(e))
-           return []
+            print("Error:", e)
+            return []
 
-    categories = ["movies"]  # extend later
+    base = "/Movies"
 
-    for cat in categories:
-        base = f"/{cat}"
-        db_cache[cat] = []
+    drives = list_dir(base)
 
-        folders = list_dir(base)
+    for drive in drives:
+        if not drive["is_dir"]:
+            continue
 
-        for folder in folders:
-            if folder["is_dir"]:
-                sub_path = f"{base}/{folder['name']}"
+        drive_path = f"{base}/{drive['name']}"
 
-                files = list_dir(sub_path)
+        movies = list_dir(drive_path)
 
-                for f in files:
-                    if f["name"].endswith((".mp4", ".mkv")):
+        for movie in movies:
+            if not movie["is_dir"]:
+                continue
 
-                        rel = f"{sub_path}/{f['name']}"
-                        url = f"/stream{quote(rel, safe='/')}"
+            movie_path = f"{drive_path}/{movie['name']}"
 
-                        meta = tmdb(folder["name"])
+            files = list_dir(movie_path)
 
-                        db_cache[cat].append({
-                            "title": meta["title"],
-                            "url": url,
-                            "poster": meta["poster"],
-                            "overview": meta["overview"]
-                        })
+            for f in files:
+                if not f["name"].lower().endswith((".mp4", ".mkv")):
+                    continue
 
-    print("SCAN DONE:", sum(len(v) for v in db_cache.values()))
+                rel = f"{movie_path}/{f['name']}"
+
+                url = f"/stream{quote(rel, safe='/')}"
+
+                meta = tmdb(movie["name"])
+
+                db_cache["movies"].append({
+                    "title": meta["title"],
+                    "url": url,
+                    "poster": meta["poster"],
+                    "overview": meta["overview"]
+                })
+
+    print("SCAN DONE:", len(db_cache["movies"]))
 
 def generate_m3u():
     lines = ["#EXTM3U"]
