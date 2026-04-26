@@ -7,6 +7,8 @@ from bs4 import BeautifulSoup
 from guessit import guessit
 import hashlib, time, secrets
 from urllib.parse import quote
+import requests
+
 
 active_streams = {}     # token -> {user, start}
 bandwidth = {}          # user -> bytes
@@ -22,6 +24,8 @@ DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 DB_NAME = os.getenv("DB_NAME")
 TMDB_KEY = os.getenv("TMDB_KEY")
+ALIST_API = "https://alist.chnjms.easypanel.host/api/fs/list"
+ALIST_PATH = "/movies"
 
 db_cache = {}
 
@@ -84,59 +88,44 @@ def scan():
     global db_cache
     db_cache = {}
 
-    MEDIA_ROOT = "/mnt"
+    def list_dir(path):
+        r = requests.post(ALIST_API, json={
+            "path": path,
+            "password": ""
+        }).json()
 
-    for drive in os.listdir(MEDIA_ROOT):
-        drive_path = os.path.join(MEDIA_ROOT, drive)
+        return r.get("data", {}).get("content", [])
 
-        if not os.path.isdir(drive_path):
-            continue
+    categories = ["movies"]  # extend later
 
-        media_path = os.path.join(drive_path, "")
+    for cat in categories:
+        base = f"/{cat}"
+        db_cache[cat] = []
 
-        if not os.path.exists(media_path):
-            continue
+        folders = list_dir(base)
 
-        # categories like movies, series, anime
-        for category in os.listdir(media_path):
-            category_path = os.path.join(media_path, category)
+        for folder in folders:
+            if folder["is_dir"]:
+                sub_path = f"{base}/{folder['name']}"
 
-            if not os.path.isdir(category_path):
-                continue
+                files = list_dir(sub_path)
 
-            if category not in db_cache:
-                db_cache[category] = []
-
-            for root, _, files in os.walk(category_path):
                 for f in files:
-                    if not f.lower().endswith((".mkv", ".mp4", ".ts")):
-                        continue
+                    if f["name"].endswith((".mp4", ".mkv")):
 
-                    full_path = os.path.join(root, f)
+                        rel = f"{sub_path}/{f['name']}"
+                        url = f"/stream{quote(rel, safe='/')}"
 
-                    # convert local path → URL path
-                    rel = full_path.split("media", 1)[-1]
+                        meta = tmdb(folder["name"])
 
-                    file_url = f"{BASE_URL}{quote(rel)}"
-
-                    # use folder name (better for Radarr)
-                    folder_name = os.path.basename(os.path.dirname(full_path))
-                    if folder_name in tmdb_cache:
-                       meta = tmdb_cache[folder_name]
-                    else:
-                       meta = tmdb(folder_name)
-                       tmdb_cache[folder_name] = meta
-                    
-
-                    db_cache[category].append({
-                        "title": meta["title"],
-                        "url": file_url,
-                        "poster": meta["poster"],
-                        "overview": meta["overview"]
-                    })
+                        db_cache[cat].append({
+                            "title": meta["title"],
+                            "url": url,
+                            "poster": meta["poster"],
+                            "overview": meta["overview"]
+                        })
 
     print("SCAN DONE:", sum(len(v) for v in db_cache.values()))
-
 
 def generate_m3u():
     lines = ["#EXTM3U"]
