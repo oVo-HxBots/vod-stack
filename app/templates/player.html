@@ -2,17 +2,88 @@
 <html>
 <head>
   <title>Player</title>
+
   <style>
-    body { margin:0; background:black }
-    video { width:100%; height:100vh }
+    body {
+      margin:0;
+      background:black;
+      color:white;
+      font-family:Arial;
+    }
+
+    video {
+      width:100%;
+      height:100vh;
+      background:black;
+    }
+
+    .controls {
+      position:fixed;
+      bottom:20px;
+      left:50%;
+      transform:translateX(-50%);
+      display:flex;
+      gap:10px;
+    }
+
+    button {
+      padding:10px;
+      background:#e50914;
+      border:none;
+      color:white;
+      border-radius:5px;
+      cursor:pointer;
+    }
   </style>
 </head>
 
 <body>
 
-<video controls autoplay>
-  <source src="{{ video_url }}" type="video/mp4">
-</video>
+<video id="player" controls autoplay></video>
+
+<div class="controls">
+  <button onclick="skip(-10)">⏪ 10s</button>
+  <button onclick="toggle()">⏯</button>
+  <button onclick="skip(10)">⏩ 10s</button>
+</div>
+
+<script>
+const encoded = new URLSearchParams(location.search).get("url")
+const url = atob(encoded)
+
+const video = document.getElementById("player")
+video.src = url
+
+// Resume playback
+const key = "pos_" + url
+
+video.addEventListener("loadedmetadata", () => {
+  const saved = localStorage.getItem(key)
+  if(saved) video.currentTime = saved
+})
+
+// Save position
+setInterval(()=>{
+  localStorage.setItem(key, video.currentTime)
+}, 3000)
+
+// Controls
+function skip(sec){
+  video.currentTime += sec
+}
+
+function toggle(){
+  if(video.paused) video.play()
+  else video.pause()
+}
+
+// Keyboard shortcuts
+document.addEventListener("keydown", e=>{
+  if(e.key === "ArrowRight") skip(10)
+  if(e.key === "ArrowLeft") skip(-10)
+  if(e.key === " ") toggle()
+})
+</script>
 
 </body>
 </html>
