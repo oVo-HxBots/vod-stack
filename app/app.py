@@ -14,7 +14,6 @@ active_streams = {}     # token -> {user, start}
 bandwidth = {}          # user -> bytes
 MAX_TOKEN_LIFETIME = 3600  # 1 hour
 tmdb_cache = {}
-lock = threading.Lock()
 
 app = Flask(__name__)
 
