@@ -89,7 +89,7 @@ def scan():
     db_cache = {}
 
     def list_dir(path):
-    try:
+        try:
         r = requests.post(ALIST_API, json={
             "path": path,
             "password": ""
