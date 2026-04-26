@@ -1,6 +1,6 @@
 # Copyright @oVo-HxBots
 
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, request, jsonify, redirect, render_template, send_file
 import mysql.connector
 import time, os, datetime, requests
 from bs4 import BeautifulSoup
