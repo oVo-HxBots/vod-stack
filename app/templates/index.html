@@ -12,11 +12,63 @@
     }
 
     header {
-      background:black;
+      display:flex;
+      justify-content:space-between;
       padding:15px;
-      font-size:20px;
+      background:black;
     }
 
+    input {
+      padding:8px;
+      border-radius:5px;
+      border:none;
+    }
+
+    /* HERO */
+    .hero {
+      height:60vh;
+      background-size:cover;
+      background-position:center;
+      display:flex;
+      align-items:flex-end;
+      padding:30px;
+      position:relative;
+    }
+
+    .hero::after {
+      content:"";
+      position:absolute;
+      bottom:0;
+      width:100%;
+      height:100px;
+      background:linear-gradient(transparent, #141414);
+    }
+
+    .hero-content {
+      z-index:2;
+      max-width:600px;
+    }
+
+    .hero h1 {
+      margin:0;
+      font-size:40px;
+    }
+
+    .hero p {
+      color:#ccc;
+    }
+
+    .btn {
+      padding:10px 15px;
+      background:#e50914;
+      border:none;
+      color:white;
+      cursor:pointer;
+      border-radius:5px;
+      margin-top:10px;
+    }
+
+    /* ROWS */
     .row {
       margin:20px;
     }
@@ -24,13 +76,13 @@
     .scroll {
       display:flex;
       overflow-x:auto;
-      gap:10px;
+      gap:12px;
     }
 
     .card {
       min-width:160px;
       cursor:pointer;
-      transition:0.2s;
+      transition:0.3s;
     }
 
     .card:hover {
@@ -39,7 +91,10 @@
 
     .card img {
       width:160px;
-      border-radius:6px;
+      height:240px;
+      object-fit:cover;
+      border-radius:8px;
+      background:#222;
     }
 
     .title {
@@ -51,42 +106,124 @@
 
 <body>
 
-<header>🎬 VOD</header>
+<header>
+  <div>🎬 VOD</div>
+  <input id="search" placeholder="Search...">
+</header>
+
+<!-- HERO -->
+<div id="hero" class="hero">
+  <div class="hero-content">
+    <h1 id="heroTitle"></h1>
+    <p id="heroDesc"></p>
+    <button class="btn" onclick="playHero()">▶ Play</button>
+  </div>
+</div>
 
 <div id="content"></div>
 
 <script>
+let DATA = {}
+let HERO = null
+
 fetch('/api')
   .then(r=>r.json())
   .then(data=>{
-    Object.keys(data).forEach(cat=>{
-      const row = document.createElement('div')
-      row.className = 'row'
+    DATA = data
 
-      row.innerHTML = `<h2>${cat}</h2><div class="scroll"></div>`
-      const scroll = row.querySelector('.scroll')
+    // 🎬 HERO = random movie
+    const movies = data.movies || []
+    HERO = movies[Math.floor(Math.random()*movies.length)]
 
-      data[cat].forEach(item=>{
-        const card = document.createElement('div')
-        card.className = 'card'
+    if(HERO){
+      hero.style.backgroundImage = `url(${HERO.poster})`
+      heroTitle.innerText = HERO.title
+      heroDesc.innerText = HERO.overview
+    }
 
-        card.innerHTML = `
-          <img src="${item.poster}">
-          <div class="title">${item.title}</div>
-        `
-
-        card.onclick = () => {
-          const encoded = btoa(item.url)
-          window.location = "/player?url=" + encoded
-        }
-        }
-
-        scroll.appendChild(card)
-      })
-
-      document.getElementById('content').appendChild(row)
-    })
+    render(data)
   })
+
+function playHero(){
+  const encoded = btoa(HERO.url)
+  window.location = "/player?url=" + encoded
+}
+
+function render(data){
+  content.innerHTML = ""
+
+  // 🆕 RECENTLY ADDED (latest 10)
+  if(data.movies){
+    const recent = [...data.movies].slice(-10).reverse()
+    createRow("Recently Added", recent)
+  }
+
+  Object.keys(data).forEach(cat=>{
+    if(!data[cat].length) return
+    createRow(cat.toUpperCase(), data[cat])
+  })
+}
+
+function createRow(title, items){
+  const row = document.createElement('div')
+  row.className = 'row'
+
+  row.innerHTML = `<h2>${title}</h2><div class="scroll"></div>`
+  const scroll = row.querySelector('.scroll')
+
+  items.forEach(item=>{
+    const card = document.createElement('div')
+    card.className = 'card'
+
+    card.innerHTML = `
+      <img data-src="${item.poster}">
+      <div class="title">${item.title}</div>
+    `
+
+    card.onclick = ()=>{
+      const encoded = btoa(item.url)
+      window.location = "/player?url=" + encoded
+    }
+
+    scroll.appendChild(card)
+  })
+
+  content.appendChild(row)
+}
+
+/* ⚡ LAZY LOADING */
+
+const observer = new IntersectionObserver(entries=>{
+  entries.forEach(entry=>{
+    if(entry.isIntersecting){
+      const img = entry.target
+      img.src = img.dataset.src
+      observer.unobserve(img)
+    }
+  })
+})
+
+setInterval(()=>{
+  document.querySelectorAll("img[data-src]").forEach(img=>{
+    observer.observe(img)
+  })
+},1000)
+
+/* 🔍 SEARCH */
+
+search.addEventListener("input", e=>{
+  const q = e.target.value.toLowerCase()
+
+  const filtered = {}
+
+  Object.keys(DATA).forEach(cat=>{
+    filtered[cat] = DATA[cat].filter(x =>
+      x.title.toLowerCase().includes(q)
+    )
+  })
+
+  render(filtered)
+})
 </script>
 
 </body>
