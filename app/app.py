@@ -90,20 +90,27 @@ def scan():
 
     def list_dir(path):
         try:
-            r = requests.post(ALIST_API, json={
-                "path": path,
-                "password": ""
-            }, timeout=10).json()
+           r = requests.post(ALIST_API, json={
+               "path": path,
+               "password": ""
+           }, timeout=10)
 
-            if r.get("code") != 200:
-                print("Alist error:", r)
-                return []
+           data = r.json()
 
-            return r.get("data", {}).get("content", [])
+           if data.get("code") != 200:
+               print("Alist error:", path, data)
+               return []   # ✅ ALWAYS return list
+
+           content = data.get("data", {}).get("content")
+
+           if not content:
+               return []   # ✅ prevent None
+
+           return content
 
         except Exception as e:
-            print("Error:", e)
-            return []
+           print("LIST_DIR ERROR:", path, str(e))
+           return []       # ✅ NEVER return None
 
     base = "/Movies"
 
