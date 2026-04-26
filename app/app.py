@@ -90,26 +90,26 @@ def scan():
 
     def list_dir(path):
         try:
-        r = requests.post(ALIST_API, json={
-            "path": path,
-            "password": ""
-        }, timeout=10)
+           r = requests.post(ALIST_API, json={
+               "path": path,
+               "password": ""
+           }, timeout=10)
 
-        data = r.json()
+           data = r.json()
 
-        # 🔥 DEBUG (optional)
-        print("ALIST RESPONSE:", data)
+           # 🔥 DEBUG (optional)
+           print("ALIST RESPONSE:", data)
 
-        # ❌ handle error
-        if data.get("code") != 200:
-            print("Alist error:", data.get("message"))
-            return []
+           # ❌ handle error
+           if data.get("code") != 200:
+               print("Alist error:", data.get("message"))
+               return []
 
-        return data.get("data", {}).get("content", [])
+           return data.get("data", {}).get("content", [])
 
-    except Exception as e:
-        print("LIST_DIR ERROR:", str(e))
-        return []
+        except Exception as e:
+           print("LIST_DIR ERROR:", str(e))
+           return []
 
     categories = ["movies"]  # extend later
 
