@@ -239,7 +239,7 @@ def generate_m3u():
             lines.append(
     f'#EXTINF:-1 tvg-logo="{item["poster"]}" group-title="{group}",{item["title"]}'
 )
-            lines.append(item["url"])
+            lines.append(BASE_URL + item["url"])
 
     with open("playlist.m3u", "w") as f:
         f.write("\n".join(lines))
