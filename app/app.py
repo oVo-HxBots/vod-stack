@@ -421,7 +421,34 @@ def streams():
 def bw():
     return bandwidth
 
-    
+
+
+
+@app.route("/stream/<path:filepath>")
+def stream(filepath):
+
+    # convert URL path → Alist path
+    alist_path = "/" + filepath
+
+    try:
+        r = requests.post("http://vod.stableserver.one/api/fs/get", json={
+            "path": alist_path,
+            "password": ""
+        }, timeout=10).json()
+
+        if r.get("code") != 200:
+            return {"error": "file not found"}, 404
+
+        url = r.get("data", {}).get("raw_url")
+
+        if not url:
+            return {"error": "no link"}, 404
+
+        # 🔥 redirect to real stream
+        return redirect(url)
+
+    except Exception as e:
+        return {"error": str(e)}, 500
     
 # ---------------- START ----------------
 
