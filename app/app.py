@@ -89,22 +89,28 @@ def scan():
     db_cache = {"movies": []}
 
     def list_dir(path):
-        try:
-            r = requests.post(ALIST_API, json={
-                "path": path,
-                "password": ""
-            }, timeout=10).json()
+    try:
+        r = requests.post(ALIST_API, json={
+            "path": path,
+            "password": ""
+        }, timeout=10)
 
-            if r.get("code") != 200:
-                print("Alist error:", r)
-                return []
+        data = r.json()
 
-            return r.get("data", {}).get("content", [])
+        if data.get("code") != 200:
+            print("Alist error:", path, data)
+            return []   # ✅ ALWAYS return list
 
-        except Exception as e:
-            print("Error:", e)
-            return []
+        content = data.get("data", {}).get("content")
 
+        if not content:
+            return []   # ✅ prevent None
+
+        return content
+
+    except Exception as e:
+        print("LIST_DIR ERROR:", path, str(e))
+        return []       # ✅ NEVER return None
     base = "/Movies"
 
     drives = list_dir(base)
@@ -123,7 +129,7 @@ def scan():
 
             movie_path = f"{drive_path}/{movie['name']}"
 
-            files = list_dir(movie_path)
+            files = list_dir(movie_path) or []
 
             for f in files:
                 if not f["name"].lower().endswith((".mp4", ".mkv")):
