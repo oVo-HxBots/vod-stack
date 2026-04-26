@@ -24,7 +24,7 @@ DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 DB_NAME = os.getenv("DB_NAME")
 TMDB_KEY = os.getenv("TMDB_KEY")
-ALIST_API = "https://alist.chnjms.easypanel.host/api/fs/list"
+ALIST_API = os.getenv("ALIST_API")
 ALIST_PATH = "/movies"
 
 db_cache = {}
