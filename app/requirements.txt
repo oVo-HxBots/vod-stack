@@ -1,5 +1,5 @@
 flask
-mysql-connector-python
+git+https://github.com/mysql/mysql-connector-python.git
 requests
 beautifulsoup4
 guessit
