@@ -8,6 +8,7 @@ from guessit import guessit
 import hashlib, time, secrets
 from urllib.parse import quote
 import requests
+import re
 
 
 active_streams = {}     # token -> {user, start}
@@ -75,14 +76,20 @@ def detect_category(path):
     return "movies"
 
 
-def tmdb_cached(name):
-    if name in tmdb_cache:
-        return tmdb_cache[name]
+def tmdb_cached(title, is_series=False):
+    key = f"{title}_{is_series}"
 
-    meta = tmdb(name)
-    tmdb_cache[name] = meta
-    return meta
+    if key in tmdb_cache:
+        return tmdb_cache[key]
 
+    data = tmdb(title, is_series=is_series)
+    tmdb_cache[key] = data
+    return data
+
+
+def get_categories():
+    root = alist_list("/Movies")
+    return [f["name"] for f in root if f.get("is_dir")]
 
 def list_dir(path):
     try:
@@ -101,97 +108,107 @@ def list_dir(path):
 
 
 
-def tmdb(title):
+def tmdb(title, is_series=False):
+    url = f"https://api.themoviedb.org/3/search/{'tv' if is_series else 'movie'}"
+    params = {"api_key": TMDB_KEY, "query": title}
+
     try:
-        r = requests.get(
-            "https://api.themoviedb.org/3/search/multi",
-            params={"api_key": TMDB_KEY, "query": title}
-        ).json()
+        r = requests.get(url, params=params).json()
+        if not r.get("results"):
+            return {"title": title, "poster": "", "overview": "", "genres": []}
 
-        if r.get("results"):
-            d = r["results"][0]
-            poster = ""
-            if d.get("poster_path"):
-                poster = "https://image.tmdb.org/t/p/w500" + d["poster_path"]
+        data = r["results"][0]
 
-            return {
-                "title": d.get("title") or d.get("name"),
-                "overview": d.get("overview", ""),
-                "poster": poster
-            }
+        genres = data.get("genre_ids", [])
+
+        # 🔥 map genre IDs to names (simple map)
+        GENRE_MAP = {
+            28:"Action", 35:"Comedy", 18:"Drama", 27:"Horror",
+            878:"Sci-Fi", 10749:"Romance", 80:"Crime"
+        }
+
+        genre_names = [GENRE_MAP.get(g, "Other") for g in genres]
+
+        return {
+            "title": data.get("title") or data.get("name"),
+            "poster": "https://image.tmdb.org/t/p/w500" + data.get("poster_path",""),
+            "overview": data.get("overview",""),
+            "genres": genre_names
+        }
+
     except:
-        pass
-
-    return {"title": title, "overview": "", "poster": ""}
+        return {"title": title, "poster": "", "overview": "", "genres": []}
 
 # ---------------- SCAN ----------------
 
-def scan():
-    global db_cache
-    db_cache = {"movies": []}
+def is_series(name):
+    return re.search(r"S\d+E\d+", name, re.IGNORECASE)
 
-    def list_dir(path):
-        try:
-           r = requests.post(ALIST_API, json={
-               "path": path,
-               "password": ""
-           }, timeout=10)
+def scan_category(category):
+    base = f"/Movies/{category}"
+    items = []
 
-           data = r.json()
+    def walk(path):
+        files = alist_list(path) or []
 
-           if data.get("code") != 200:
-               print("Alist error:", path, data)
-               return []   # ✅ ALWAYS return list
+        for f in files:
+            name = f["name"]
+            full = f"{path}/{name}"
 
-           content = data.get("data", {}).get("content")
-
-           if not content:
-               return []   # ✅ prevent None
-
-           return content
-
-        except Exception as e:
-           print("LIST_DIR ERROR:", path, str(e))
-           return []       # ✅ NEVER return None
-
-    base = "/Movies"
-
-    drives = list_dir(base)
-
-    for drive in drives:
-        if not drive["is_dir"]:
-            continue
-
-        drive_path = f"{base}/{drive['name']}"
-
-        movies = list_dir(drive_path)
-
-        for movie in movies:
-            if not movie["is_dir"]:
-                continue
-
-            movie_path = f"{drive_path}/{movie['name']}"
-
-            files = list_dir(movie_path)
-
-            for f in files:
-                if not f["name"].lower().endswith((".mp4", ".mkv")):
+            if f["is_dir"]:
+                walk(full)
+            else:
+                if not name.lower().endswith((".mp4", ".mkv")):
                     continue
 
-                rel = f"{movie_path}/{f['name']}"
+                folder = path.split("/")[-1]
 
-                url = f"/stream{quote(rel, safe='/')}"
+                series = is_series(name)
 
-                meta = tmdb(movie["name"])
-
-                db_cache["movies"].append({
-                    "title": meta["title"],
-                    "url": url,
-                    "poster": meta["poster"],
-                    "overview": meta["overview"]
+                items.append({
+                    "title": folder,
+                    "file": name,
+                    "path": full,
+                    "category": category,
+                    "type": "series" if series else "movie"
                 })
 
-    print("SCAN DONE:", len(db_cache["movies"]))
+    walk(base)
+    return items
+
+
+def scan():
+    global db_cache
+
+    db_cache = {
+        "movies": {},
+        "series": {}
+    }
+
+    categories = get_categories()
+
+    for cat in categories:
+        items = scan_category(cat)
+
+        db_cache["movies"][cat] = []
+        db_cache["series"][cat] = []
+
+        for item in items:
+            meta = tmdb_cached(item["title"], item["type"] == "series")
+
+            entry = {
+                "title": meta["title"],
+                "poster": meta["poster"],
+                "overview": meta["overview"],
+                "url": f"/stream{quote(item['path'], safe='/')}"
+            }
+
+            if item["type"] == "series":
+                db_cache["series"][cat].append(entry)
+            else:
+                db_cache["movies"][cat].append(entry)
+
+    print("Scan complete")
 
 
 
