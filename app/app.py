@@ -200,7 +200,9 @@ def scan():
                 "title": meta["title"],
                 "poster": meta["poster"],
                 "overview": meta["overview"],
-                "url": f"/stream{quote(item['path'], safe='/')}"
+                "genres": meta["genres"],
+                "url": f"/stream{quote(path, safe='/')}",
+                "type": item["type"]  # movie / series
             }
 
             if item["type"] == "series":
@@ -261,6 +263,68 @@ def generate_m3u():
     with open("playlist.m3u", "w") as f:
         f.write("\n".join(lines))
 
+
+def generate_genre_playlists():
+    BASE = os.getenv("BASE_URL")
+
+    base_dir = "/app/playlists"
+    movies_dir = f"{base_dir}/Movies"
+    series_dir = f"{base_dir}/Series"
+
+    os.makedirs(movies_dir, exist_ok=True)
+    os.makedirs(series_dir, exist_ok=True)
+
+    movie_genres = {}
+    series_genres = {}
+
+    # 🔁 group by genre
+    for content_type in ["movies", "series"]:
+        for category, items in db_cache[content_type].items():
+            for item in items:
+
+                genres = item.get("genres", ["Other"])
+
+                for g in genres:
+                    target = movie_genres if content_type == "movies" else series_genres
+
+                    if g not in target:
+                        target[g] = []
+
+                    target[g].append(item)
+
+    # 🎬 create movie playlists
+    for genre, items in movie_genres.items():
+        lines = ["#EXTM3U"]
+
+        for item in items:
+            url = BASE + item["url"]
+
+            lines.append(
+                f'#EXTINF:-1 tvg-id="{item["title"]}" tvg-logo="{item["poster"]}" group-title="{genre}",{item["title"]}'
+            )
+            lines.append(url)
+
+        with open(f"{movies_dir}/{genre}.m3u", "w") as f:
+            f.write("\n".join(lines))
+
+    # 📺 create series playlists
+    for genre, items in series_genres.items():
+        lines = ["#EXTM3U"]
+
+        for item in items:
+            url = BASE + item["url"]
+
+            lines.append(
+                f'#EXTINF:-1 tvg-id="{item["title"]}" tvg-logo="{item["poster"]}" group-title="{genre}",{item["title"]}'
+            )
+            lines.append(url)
+
+        with open(f"{series_dir}/{genre}.m3u", "w") as f:
+            f.write("\n".join(lines))
+
+    print("Genre playlists generated")
+
+
 # ---------------- EPG ----------------
 
 def generate_epg():
@@ -289,11 +353,20 @@ def generate_epg():
 
 # ---------------- ROUTES ----------------
 
+@app.route("/playlist/movies/<genre>.m3u")
+def movie_genre(genre):
+    return send_file(f"/app/playlists/Movies/{genre}.m3u")
+
+
+@app.route("/playlist/series/<genre>.m3u")
+def series_genre(genre):
+    return send_file(f"/app/playlists/Series/{genre}.m3u")
+
 @app.route("/scan")
 def rescan():
     scan()
-    generate_m3u()
     generate_epg()
+    generate_genre_playlists()
     return {"status": "updated", "items": sum(len(v) for v in db_cache.values())}
 
 @app.route("/playlist.m3u")
